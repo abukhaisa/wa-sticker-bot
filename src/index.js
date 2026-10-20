@@ -64,9 +64,18 @@ async function startBot() {
       if (connection === 'close') {
         setBotStatus('Koneksi Terputus');
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const errMessage = lastDisconnect?.error?.message || '';
+        const isConflict = errMessage.toLowerCase().includes('conflict');
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut || isConflict;
 
-        logger.warn(`Koneksi terputus. Kode status: ${statusCode || 'Unknown'}. Alasan: ${lastDisconnect?.error?.message || 'None'}`);
+        logger.warn(`Koneksi terputus. Kode status: ${statusCode || 'Unknown'}. Alasan: ${errMessage || 'None'}`);
+
+        if (isConflict) {
+          logger.warn('⚠️ Konflik Sesi Terdeteksi: Bot sedang berjalan di 2 tempat sekaligus!');
+          logger.warn('Pastikan hanya ADA SATU proses bot yang aktif (misal: matikan yang di laptop jika sedang menjalankan di server/Termux).');
+          setTimeout(() => startBot(), 15000);
+          return;
+        }
 
         if (shouldReconnect) {
           reconnectAttempts++;

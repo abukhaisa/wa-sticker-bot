@@ -30,15 +30,8 @@ export class MessageHandler {
     if (from === 'status@broadcast') return;
     if (from.endsWith('@newsletter')) return;
 
-    // Normalisasi ID pengirim (khusus grup vs private chat vs self-chat)
-    let rawSender = from;
-    if (from.endsWith('@g.us')) {
-      rawSender = m.key.participant || from;
-    } else if (m.key.fromMe) {
-      rawSender = sock.user?.id || config.ownerNumber;
-    }
-
-    const sender = adminManager.cleanJid(rawSender);
+    // Normalisasi ID pengirim (Menyelesaikan WhatsApp LID dan nomor telepon asli)
+    const sender = await this.resolveSenderJid(sock, m);
     const isOwner = adminManager.isOwner(sender);
     const isAdmin = adminManager.isAdmin(sender);
     const userRole = adminManager.getRole(sender);
@@ -158,6 +151,55 @@ export class MessageHandler {
         // Jangan merespon perintah asing untuk efisiensi
         break;
     }
+  }
+
+  /**
+   * Mengambil JID pengirim asli (Phone Number), menyelesaikan WhatsApp LID jika ada
+   */
+  static async resolveSenderJid(sock, m) {
+    const from = m.key.remoteJid;
+
+    // 1. Prioritaskan remoteJidAlt / participantAlt jika membawa nomor asli (@s.whatsapp.net)
+    const alt = m.key.participantAlt || m.key.remoteJidAlt;
+    if (alt && alt.endsWith('@s.whatsapp.net')) {
+      const cleanAlt = adminManager.cleanJid(alt);
+      if (from && from.endsWith('@lid')) {
+        adminManager.linkLID(from, cleanAlt);
+      }
+      return cleanAlt;
+    }
+
+    // 2. Tentukan rawSender
+    let rawSender = from;
+    if (from.endsWith('@g.us')) {
+      rawSender = m.key.participant || from;
+    } else if (m.key.fromMe) {
+      rawSender = sock.user?.id || config.ownerNumber;
+    }
+
+    // 3. Resolusi jika rawSender berupa LID (@lid)
+    if (rawSender && rawSender.includes('@lid')) {
+      const mapped = adminManager.getPNForLID(rawSender);
+      if (mapped) return mapped;
+
+      try {
+        if (sock.signalRepository?.lidMapping?.getPNForLID) {
+          const resolved = await sock.signalRepository.lidMapping.getPNForLID(rawSender.split(':')[0]);
+          if (resolved) {
+            const clean = adminManager.cleanJid(resolved);
+            adminManager.linkLID(rawSender, clean);
+            return clean;
+          }
+        }
+      } catch (e) {}
+
+      // Jika LID ini milik owner yang terdaftar
+      if (adminManager.isOwner(rawSender)) {
+        return adminManager.owner;
+      }
+    }
+
+    return adminManager.cleanJid(rawSender);
   }
 
   /**

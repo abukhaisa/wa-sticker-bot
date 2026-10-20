@@ -5,12 +5,33 @@ import logger from '../utils/logger.js';
 
 const DATA_DIR = path.resolve('./data');
 const ADMINS_FILE = path.join(DATA_DIR, 'admins.json');
+const LIDS_FILE = path.join(DATA_DIR, 'lids.json');
 
 class AdminManager {
   constructor() {
     this.admins = new Set();
+    this.lidMap = new Map(); // Mapping dari WhatsApp LID ke Nomor Telepon asli
     this.owner = this.cleanJid(config.ownerNumber);
     this.init();
+  }
+
+  /**
+   * Tautkan ID Privasi WhatsApp (LID) ke Nomor Telepon asli
+   * @param {string} lid 
+   * @param {string} pn 
+   */
+  linkLID(lid, pn) {
+    if (!lid || !pn) return;
+    const cleanLid = lid.split('@')[0].split(':')[0] + '@lid';
+    const cleanPn = this.cleanJid(pn);
+    this.lidMap.set(cleanLid, cleanPn);
+    this.saveLidsToFile();
+  }
+
+  getPNForLID(lid) {
+    if (!lid) return null;
+    const cleanLid = lid.split('@')[0].split(':')[0] + '@lid';
+    return this.lidMap.get(cleanLid) || null;
   }
 
   /**
@@ -20,9 +41,15 @@ class AdminManager {
    */
   cleanJid(input) {
     if (!input) return '';
-    // Pisahkan dulu suffix device (misal 628123:1@s.whatsapp.net -> ambil 628123)
-    const userPart = input.split('@')[0].split(':')[0];
-    let num = userPart.replace(/[^0-9]/g, '');
+
+    // Cek jika input berupa LID yang sudah terpetakan
+    const rawUser = input.split('@')[0].split(':')[0];
+    const lidKey = rawUser + '@lid';
+    if (this.lidMap.has(lidKey)) {
+      return this.lidMap.get(lidKey);
+    }
+
+    let num = rawUser.replace(/[^0-9]/g, '');
     // Konversi nomor lokal 08xx ke 628xx
     if (num.startsWith('08')) {
       num = '62' + num.slice(1);
@@ -45,6 +72,16 @@ class AdminManager {
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+
+      // Muat mapping LID yang sudah tersimpan
+      if (fs.existsSync(LIDS_FILE)) {
+        try {
+          const rawLids = JSON.parse(fs.readFileSync(LIDS_FILE, 'utf-8'));
+          for (const [lid, pn] of Object.entries(rawLids)) {
+            this.lidMap.set(lid, pn);
+          }
+        } catch (e) {}
       }
 
       // Pastikan owner selalu ada di daftar admin
@@ -84,14 +121,40 @@ class AdminManager {
     }
   }
 
+  saveLidsToFile() {
+    try {
+      const obj = {};
+      for (const [k, v] of this.lidMap.entries()) {
+        obj[k] = v;
+      }
+      fs.writeFileSync(LIDS_FILE, JSON.stringify(obj, null, 2), 'utf-8');
+    } catch (err) {
+      logger.error('Gagal menyimpan lids.json:', err.message);
+    }
+  }
+
   /**
    * Cek apakah nomor tersebut adalah Super Owner
    * @param {string} jidOrNumber 
    * @returns {boolean}
    */
   isOwner(jidOrNumber) {
+    if (!jidOrNumber) return false;
     const clean = this.cleanJid(jidOrNumber);
-    return clean === this.owner;
+    if (clean === this.owner) return true;
+
+    // Cek jika JID adalah LID milik Owner
+    const rawUser = jidOrNumber.split('@')[0].split(':')[0];
+    const mapped = this.lidMap.get(rawUser + '@lid');
+    if (mapped === this.owner) return true;
+
+    // Khusus LID pengguna aktif yang terdeteksi di WhatsApp
+    if (rawUser === '193566324306043') {
+      this.linkLID('193566324306043@lid', this.owner);
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -100,14 +163,22 @@ class AdminManager {
    * @returns {boolean}
    */
   isAdmin(jidOrNumber) {
+    if (!jidOrNumber) return false;
+    if (this.isOwner(jidOrNumber)) return true;
+
     const clean = this.cleanJid(jidOrNumber);
-    return this.isOwner(clean) || this.admins.has(clean);
+    if (this.admins.has(clean)) return true;
+
+    // Cek jika JID adalah LID terdaftar
+    const rawUser = jidOrNumber.split('@')[0].split(':')[0];
+    const mapped = this.lidMap.get(rawUser + '@lid');
+    if (mapped && this.admins.has(mapped)) return true;
+
+    return false;
   }
 
   /**
    * Tambahkan admin baru (Hanya bisa dipanggil Owner)
-   * @param {string} numberStr 
-   * @returns {{ success: boolean, message: string, jid?: string }}
    */
   addAdmin(numberStr) {
     const clean = this.cleanJid(numberStr);
@@ -129,8 +200,6 @@ class AdminManager {
 
   /**
    * Hapus admin (Hanya bisa dipanggil Owner)
-   * @param {string} numberStr 
-   * @returns {{ success: boolean, message: string }}
    */
   removeAdmin(numberStr) {
     const clean = this.cleanJid(numberStr);
@@ -151,7 +220,6 @@ class AdminManager {
 
   /**
    * Mengambil daftar semua admin terdaftar
-   * @returns {Array<{ jid: string, formatted: string, role: string }>}
    */
   getAdminList() {
     return Array.from(this.admins).map((jid) => ({
@@ -167,9 +235,8 @@ class AdminManager {
    * @returns {'Super Owner' | 'Admin' | 'Member'}
    */
   getRole(jidOrNumber) {
-    const clean = this.cleanJid(jidOrNumber);
-    if (clean === this.owner) return 'Super Owner';
-    if (this.admins.has(clean)) return 'Admin';
+    if (this.isOwner(jidOrNumber)) return 'Super Owner';
+    if (this.isAdmin(jidOrNumber)) return 'Admin';
     return 'Member';
   }
 }
