@@ -20,12 +20,14 @@ class AdminManager {
    */
   cleanJid(input) {
     if (!input) return '';
-    let num = input.replace(/[^0-9]/g, '');
+    // Pisahkan dulu suffix device (misal 628123:1@s.whatsapp.net -> ambil 628123)
+    const userPart = input.split('@')[0].split(':')[0];
+    let num = userPart.replace(/[^0-9]/g, '');
     // Konversi nomor lokal 08xx ke 628xx
     if (num.startsWith('08')) {
       num = '62' + num.slice(1);
     }
-    return num + '@s.whatsapp.net';
+    return num ? (num + '@s.whatsapp.net') : '';
   }
 
   /**
@@ -33,7 +35,9 @@ class AdminManager {
    * @param {string} jid 
    */
   formatNumber(jid) {
-    const num = jid.split('@')[0];
+    if (!jid) return '+0';
+    const clean = this.cleanJid(jid);
+    const num = clean.split('@')[0];
     return `+${num}`;
   }
 

@@ -17,17 +17,6 @@ export class MessageHandler {
     if (!m.message) return;
 
     const from = m.key.remoteJid;
-    // Abaikan pesan dari diri sendiri, status broadcast, atau saluran (newsletter)
-    if (m.key.fromMe) return;
-    if (from === 'status@broadcast') return;
-    if (from.endsWith('@newsletter')) return;
-
-    // Normalisasi ID pengirim (khusus grup vs private chat)
-    const sender = m.key.participant || from;
-    const isOwner = adminManager.isOwner(sender);
-    const isAdmin = adminManager.isAdmin(sender);
-    const userRole = adminManager.getRole(sender);
-
     // Ekstrak teks pesan
     const body = this.extractMessageText(m);
     if (!body) return;
@@ -37,6 +26,23 @@ export class MessageHandler {
     const isCommand = body.startsWith(prefix);
     if (!isCommand) return;
 
+    // Abaikan status broadcast atau saluran (newsletter)
+    if (from === 'status@broadcast') return;
+    if (from.endsWith('@newsletter')) return;
+
+    // Normalisasi ID pengirim (khusus grup vs private chat vs self-chat)
+    let rawSender = from;
+    if (from.endsWith('@g.us')) {
+      rawSender = m.key.participant || from;
+    } else if (m.key.fromMe) {
+      rawSender = sock.user?.id || config.ownerNumber;
+    }
+
+    const sender = adminManager.cleanJid(rawSender);
+    const isOwner = adminManager.isOwner(sender);
+    const isAdmin = adminManager.isAdmin(sender);
+    const userRole = adminManager.getRole(sender);
+
     // 1. SIMULASI ANTI-BANNED: Simulasi Centang Biru (Membaca pesan) secara alami
     await Humanizer.simulateReadReceipt(sock, m.key);
 
@@ -44,7 +50,7 @@ export class MessageHandler {
     const command = (args.shift() || '').toLowerCase();
     const query = args.join(' ');
 
-    logger.info(`[${userRole.toUpperCase()}] Perintah: [${prefix}${command}] dari ${sender.split('@')[0]}`);
+    logger.info(`[${userRole.toUpperCase()}] Perintah: [${prefix}${command}] dari ${adminManager.formatNumber(sender)}`);
 
     // Route Perintah
     switch (command) {

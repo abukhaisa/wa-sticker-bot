@@ -1,10 +1,13 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const rawOwner = (process.env.OWNER_NUMBER || '6281234567890').split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+const formattedOwner = (rawOwner.startsWith('08') ? '62' + rawOwner.slice(1) : rawOwner) + '@s.whatsapp.net';
+
 export const config = {
   // Informasi Dasar Bot
   botName: process.env.BOT_NAME || 'StickerCraft Bot',
-  ownerNumber: (process.env.OWNER_NUMBER || '6281234567890').replace(/[^0-9]/g, '') + '@s.whatsapp.net',
+  ownerNumber: formattedOwner,
   prefix: process.env.PREFIX || '.', // Prefix command, e.g. ., !, /, or #
 
   // Konfigurasi Metadata Stiker (EXIF)
