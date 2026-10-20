@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  sticker-bot:
+    build: .
+    container_name: wa_sticker_bot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - BOT_NAME="StickerCraft Bot"
+      - OWNER_NUMBER="6281234567890"
+      - ADMIN_NUMBERS=""
+      - PREFIX=.
+      - USER_COOLDOWN_SEC=6
+      - DAILY_LIMIT=40
+    volumes:
+      # Mount folder auth_info agar sesi WhatsApp tidak hilang
+      - ./auth_info:/app/auth_info
+      # Mount folder data agar daftar admin dan banned tersimpan permanen
+      - ./data:/app/data
