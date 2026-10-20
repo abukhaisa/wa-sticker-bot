@@ -2,7 +2,6 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  makeInMemoryStore,
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcodeTerminal from 'qrcode-terminal';
