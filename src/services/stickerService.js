@@ -11,6 +11,14 @@ import logger from '../utils/logger.js';
 try {
   const binaryPath = process.env.SYSTEM_FFMPEG || ffmpegInstaller.path;
   if (binaryPath) {
+    // Pastikan binary FFmpeg memiliki izin eksekusi (chmod +x) di container Linux
+    if (process.platform === 'linux' && fs.existsSync(binaryPath)) {
+      try {
+        fs.chmodSync(binaryPath, 0o755);
+      } catch (e) {
+        // Abaikan jika tidak memiliki hak akses chmod
+      }
+    }
     ffmpeg.setFfmpegPath(binaryPath);
     process.env.FFMPEG_PATH = binaryPath;
     logger.info(`FFmpeg diinisialisasi pada: ${binaryPath}`);
