@@ -7,24 +7,35 @@ import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import config from '../../config.js';
 import logger from '../utils/logger.js';
 
-// Setup path FFmpeg (gunakan sistem jika ada, atau fallback ke package installer)
+import { execSync } from 'child_process';
+
+// Setup path FFmpeg (otomatis deteksi sistem di Termux/Linux atau fallback ke package installer)
+let resolvedFfmpeg = null;
+
 try {
-  const binaryPath = process.env.SYSTEM_FFMPEG || ffmpegInstaller.path;
-  if (binaryPath) {
-    // Pastikan binary FFmpeg memiliki izin eksekusi (chmod +x) di container Linux
-    if (process.platform === 'linux' && fs.existsSync(binaryPath)) {
-      try {
-        fs.chmodSync(binaryPath, 0o755);
-      } catch (e) {
-        // Abaikan jika tidak memiliki hak akses chmod
+  // 1. Cek apakah ffmpeg sudah terpasang di sistem (seperti di Termux: pkg install ffmpeg)
+  execSync('ffmpeg -version', { stdio: 'ignore' });
+  resolvedFfmpeg = 'ffmpeg';
+  logger.info('FFmpeg sistem terdeteksi di PATH.');
+} catch (e) {
+  // 2. Jika tidak ada di PATH, gunakan @ffmpeg-installer
+  try {
+    const binaryPath = process.env.SYSTEM_FFMPEG || ffmpegInstaller.path;
+    if (binaryPath) {
+      if (process.platform === 'linux' && fs.existsSync(binaryPath)) {
+        try { fs.chmodSync(binaryPath, 0o755); } catch (err) {}
       }
+      resolvedFfmpeg = binaryPath;
     }
-    ffmpeg.setFfmpegPath(binaryPath);
-    process.env.FFMPEG_PATH = binaryPath;
-    logger.info(`FFmpeg diinisialisasi pada: ${binaryPath}`);
-  }
-} catch (err) {
-  logger.warn('Gagal menginisialisasi path FFmpeg otomatis:', err.message);
+  } catch (err) {}
+}
+
+if (resolvedFfmpeg) {
+  ffmpeg.setFfmpegPath(resolvedFfmpeg);
+  process.env.FFMPEG_PATH = resolvedFfmpeg;
+  logger.info(`FFmpeg diinisialisasi pada: ${resolvedFfmpeg}`);
+} else {
+  logger.warn('FFmpeg tidak ditemukan! Pastikan FFmpeg terinstall di sistem.');
 }
 
 export class StickerService {
