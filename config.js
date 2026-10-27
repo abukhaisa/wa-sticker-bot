@@ -12,8 +12,8 @@ export const config = {
 
   // Konfigurasi Metadata Stiker (EXIF)
   sticker: {
-    packname: process.env.STICKER_PACKNAME || 'StickerCraft',
-    author: process.env.STICKER_AUTHOR || 'Created with Baileys',
+    packname: process.env.STICKER_PACKNAME || '.',
+    author: process.env.STICKER_AUTHOR || 'Created with EdoKetumbar',
     categories: ['🎨', '🤖'],
     quality: 60, // Kualitas stiker (1-100)
     maxVideoDuration: 9, // Maksimal durasi video (detik) untuk stiker bergerak (< 1MB)

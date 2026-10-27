@@ -121,11 +121,10 @@ export class StickerService {
               ? 'scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12'
               : 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=12',
             '-lossless 0',
-            `-qscale ${quality || 40}`,
+            `-q:v ${quality || 40}`,
             '-preset default',
             '-loop 0',
             '-an',
-            '-vsync 0',
             '-s 512:512',
           ])
           .toFormat('webp')

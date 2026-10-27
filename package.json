@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "postinstall": "node -e \"const fs=require('fs');const p='node_modules/wa-sticker-formatter/dist/internal/crop.js';if(fs.existsSync(p)){let c=fs.readFileSync(p,'utf8');c=c.replace(/'-vsync',\\s*'0',?\\s*/g,'');fs.writeFileSync(p,c);}\""
   },
   "keywords": [
     "whatsapp",
@@ -27,6 +28,10 @@
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.35.5",
     "wa-sticker-formatter": "^4.4.4"
+  },
+  "overrides": {
+    "sharp": "^0.35.5"
   }
 }
